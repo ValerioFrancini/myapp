@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:logger/logger.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('it', null);
+void main() {
   runApp(const MyApp());
 }
 
@@ -20,223 +17,187 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: '🛠✨'),
+      home: const LoginScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-  final Map<String, int> _dailyCounts = {};
-  final PageController _pageController = PageController(initialPage: 0);
+class _LoginScreenState extends State<LoginScreen> {
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _storage = const FlutterSecureStorage();
+  final _logger = Logger();
 
-  DateTime _currentWeek = _getMondayOfThisWeek();
-  int _currentPage = 0;
+  String? _errorMessage;
+  bool _isLoading = false; // Stato del loader
 
-  @override
-  void initState() {
-    super.initState();
-    _checkForNewDay();
-  }
+  Future<void> _register() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
 
-  static DateTime _getMondayOfThisWeek() {
-    final now = DateTime.now();
-    return now.subtract(Duration(days: now.weekday - 1)); // Lunedì della settimana corrente
-  }
-
-  void _updateWeek(int offset) {
-    setState(() {
-      _currentWeek = _currentWeek.add(Duration(days: 7 * offset));
-    });
-  }
-
-  void _goToCurrentWeek() {
-    setState(() {
-      _currentPage = 0;
-      _currentWeek = _getMondayOfThisWeek();
-    });
-    _pageController.animateToPage(
-      0,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
-  }
-
-  void _saveCountForToday() {
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    _dailyCounts[today] = _counter;
-  }
-
-  void _checkForNewDay() {
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    if (!_dailyCounts.containsKey(today)) {
+    if (username.isEmpty || password.isEmpty) {
       setState(() {
-        _counter = 0;
-        _saveCountForToday();
+        _errorMessage = 'Entrambi i campi sono obbligatori.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await _storage.write(key: 'username', value: username);
+      await _storage.write(key: 'password', value: password);
+
+      final storedUsername = await _storage.read(key: 'username');
+      final storedPassword = await _storage.read(key: 'password');
+      _logger.i('Dati registrati: Username=$storedUsername, Password=$storedPassword');
+
+      setState(() {
+        _errorMessage = 'Registrazione avvenuta con successo! Ora effettua il login.';
+      });
+    } catch (e) {
+      _logger.e('Errore durante la registrazione: $e');
+      setState(() {
+        _errorMessage = 'Si è verificato un errore durante la registrazione.';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
 
-  List<BarChartGroupData> _getWeekData(DateTime weekStart) {
-    List<BarChartGroupData> data = [];
-    for (int i = 0; i < 7; i++) {
-      final day = weekStart.add(Duration(days: i));
-      final dayKey = DateFormat('yyyy-MM-dd').format(day);
-      final count = _dailyCounts[dayKey] ?? 0;
-      data.add(BarChartGroupData(
-        x: i,
-        barRods: [
-          BarChartRodData(
-            toY: count.toDouble(),
-            width: 16,
-            color: Colors.deepPurple,
-          ),
-        ],
-      ));
+  Future<void> _login() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      setState(() {
+        _errorMessage = 'Entrambi i campi sono obbligatori.';
+      });
+      return;
     }
-    return data;
-  }
 
-  void _incrementCounter() {
     setState(() {
-      _counter++;
-      _saveCountForToday();
+      _isLoading = true;
+      _errorMessage = null;
     });
-  }
 
-  void _decrementCounter() {
-    setState(() {
-      if (_counter > 0) {
-        _counter--;
-        _saveCountForToday();
+    try {
+      final storedUsername = await _storage.read(key: 'username');
+      final storedPassword = await _storage.read(key: 'password');
+
+      _logger.d('Tentativo di login: Username=$username, Password=$password');
+      _logger.d('Credenziali salvate: Username=$storedUsername, Password=$storedPassword');
+
+      if (storedUsername == username && storedPassword == password) {
+        _logger.i('Login riuscito. Navigazione verso la home.');
+
+        if (!mounted) return; // Controlla che il widget sia montato
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MyHomePage(title: 'Benvenuto!')),
+        );
+      } else {
+        _logger.w('Login fallito. Nome utente o password errati.');
+        setState(() {
+          _errorMessage = 'Nome utente o password errati.';
+        });
       }
-    });
+    } catch (e) {
+      _logger.e('Errore durante il login: $e');
+      setState(() {
+        _errorMessage = 'Si è verificato un errore. Riprova.';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false; // Ferma il loader
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-        actions: [
-          IconButton(
-            onPressed: _goToCurrentWeek,
-            tooltip: 'Torna alla settimana corrente',
-            icon: const Icon(Icons.today),
-          ),
-        ],
-      ),
       body: Center(
-        child: Column(
-          children: <Widget>[
-            const SizedBox(height: 20),
-            // PageView per lo swipe tra settimane
-            SizedBox(
-              height: 240, // Altezza complessiva della card ridotta
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  final offset = index - _currentPage;
-                  _updateWeek(offset);
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                itemBuilder: (context, index) {
-                  final weekStart = _currentWeek.add(Duration(days: 7 * index));
-                  final weekTitle =
-                      '${DateFormat('dd MMM', 'it').format(weekStart)} - ${DateFormat('dd MMM', 'it').format(weekStart.add(const Duration(days: 6)))}';
-
-                  return Card(
-                    elevation: 4,
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Text(
-                            weekTitle,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        Container(
-                          height: 170, // Altezza grafico ridotta
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: _getWeekData(weekStart).isNotEmpty
-                              ? BarChart(
-                                  BarChartData(
-                                    barGroups: _getWeekData(weekStart),
-                                    borderData: FlBorderData(show: false),
-                                    gridData: FlGridData(show: false),
-                                    titlesData: FlTitlesData(
-                                      bottomTitles: AxisTitles(
-                                        sideTitles: SideTitles(
-                                          showTitles: true,
-                                          getTitlesWidget: (value, _) {
-                                            final day =
-                                                weekStart.add(Duration(days: value.toInt()));
-                                            return Text(
-                                              DateFormat('EEE', 'it').format(day),
-                                              style: const TextStyle(fontSize: 10),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      leftTitles: AxisTitles(
-                                        sideTitles: SideTitles(showTitles: false),
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : const Center(
-                                  child: Text('Nessun dato disponibile'),
-                                ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Benvenuto in eddainonfumare!',
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
-            ),
-            const SizedBox(height: 20),
-            const Text('Oggi stai a fuma così:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FloatingActionButton(
-                  onPressed: _decrementCounter,
-                  tooltip: 'Decrementa',
-                  child: const Icon(Icons.remove),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nome utente',
+                  border: OutlineInputBorder(),
                 ),
-                const SizedBox(width: 10),
-                FloatingActionButton(
-                  onPressed: _incrementCounter,
-                  tooltip: 'Incrementa',
-                  child: const Icon(Icons.add),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Password',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (_errorMessage != null)
+                Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              const SizedBox(height: 20),
+              if (_isLoading)
+                const CircularProgressIndicator()
+              else ...[
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _login,
+                  child: const Text('Login'),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: _isLoading ? null : _register,
+                  child: const Text('Non hai un account? Registrati'),
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class MyHomePage extends StatelessWidget {
+  const MyHomePage({super.key, required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    Logger().i('Rendering MyHomePage'); // Verifica il rendering della HomePage
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+      ),
+      body: Center(
+        child: Text('Benvenuto! Le tue statistiche personali saranno qui.'),
       ),
     );
   }
