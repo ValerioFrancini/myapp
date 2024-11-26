@@ -36,8 +36,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _logger = Logger();
 
   String? _errorMessage;
-  bool _isLoading = false; // Stato del loader
+  bool _isLoading = false;
 
+  // Funzione di registrazione
   Future<void> _register() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
@@ -58,17 +59,14 @@ class _LoginScreenState extends State<LoginScreen> {
       await _storage.write(key: 'username', value: username);
       await _storage.write(key: 'password', value: password);
 
-      final storedUsername = await _storage.read(key: 'username');
-      final storedPassword = await _storage.read(key: 'password');
-      _logger.i('Dati registrati: Username=$storedUsername, Password=$storedPassword');
-
+      _logger.i('Registrazione completata: Username=$username');
       setState(() {
-        _errorMessage = 'Registrazione avvenuta con successo! Ora effettua il login.';
+        _errorMessage = 'Registrazione avvenuta con successo!';
       });
     } catch (e) {
       _logger.e('Errore durante la registrazione: $e');
       setState(() {
-        _errorMessage = 'Si è verificato un errore durante la registrazione.';
+        _errorMessage = 'Errore durante la registrazione.';
       });
     } finally {
       setState(() {
@@ -77,6 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // Funzione di login
   Future<void> _login() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
@@ -97,19 +96,17 @@ class _LoginScreenState extends State<LoginScreen> {
       final storedUsername = await _storage.read(key: 'username');
       final storedPassword = await _storage.read(key: 'password');
 
-      _logger.d('Tentativo di login: Username=$username, Password=$password');
-      _logger.d('Credenziali salvate: Username=$storedUsername, Password=$storedPassword');
-
+      _logger.d('Tentativo di login: Username=$username');
       if (storedUsername == username && storedPassword == password) {
-        _logger.i('Login riuscito. Navigazione verso la home.');
+        _logger.i('Login riuscito.');
 
-        if (!mounted) return; // Controlla che il widget sia montato
+        if (!mounted) return;
+        // Navigazione diretta alla home
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const MyHomePage(title: 'Benvenuto!')),
         );
       } else {
-        _logger.w('Login fallito. Nome utente o password errati.');
         setState(() {
           _errorMessage = 'Nome utente o password errati.';
         });
@@ -167,12 +164,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 const CircularProgressIndicator()
               else ...[
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
+                  onPressed: _login,
                   child: const Text('Login'),
                 ),
                 const SizedBox(height: 10),
                 TextButton(
-                  onPressed: _isLoading ? null : _register,
+                  onPressed: _register,
                   child: const Text('Non hai un account? Registrati'),
                 ),
               ],
@@ -191,7 +188,7 @@ class MyHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Logger().i('Rendering MyHomePage'); // Verifica il rendering della HomePage
+    Logger().i('Rendering MyHomePage'); // Log per verificare il rendering
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
