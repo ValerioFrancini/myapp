@@ -11,15 +11,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  intl: ^0.20.0 # Gestione della localizzazione e formattazione delle date
-  fl_chart: ^0.69.2 # Grafici per rappresentare i dati
-  flutter_secure_storage: ^8.0.0 # Archiviazione sicura dei dati utente
-  logger: ^1.4.0 # Logging avanzato per debug e monitoraggio
+  intl: ^0.20.0  # Gestione della localizzazione e formattazione delle date
+  fl_chart: ^0.69.2  # Grafici per rappresentare i dati
+  flutter_secure_storage: ^9.2.2  # Ultima versione disponibile
+  logger: ^2.5.0  # Ultima versione disponibile
+  path_provider: ^2.1.5  # Necessario per l'archiviazione sicura
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^5.1.0  # Aggiornato alla versione più recente
 
 flutter:
   uses-material-design: true
