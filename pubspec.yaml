@@ -11,15 +11,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
-  intl: ^0.18.0 # Added the dependency for date formatting
-  fl_chart: ^0.55.0
+  intl: ^0.20.0
+  fl_chart: ^0.69.2
+
 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:intl/date_symbol_data_local.dart'; // For locale initialization
+import 'package:intl/date_symbol_data_local.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter is initialized
-  await initializeDateFormatting('it', null); // Initialize locale for Italian
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('it', null);
   runApp(const MyApp());
 }
 
@@ -20,7 +20,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'davvero si fanno così i soldi? :/'),
+      home: const MyHomePage(title: '🛠✨'),
     );
   }
 }
@@ -36,32 +36,64 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
-  final Map<String, int> _dailyCounts = {}; // Keeps track of daily cigarette counts
-  bool _isExpanded = false; // Toggles the card expansion state
+  final Map<String, int> _dailyCounts = {};
+  final PageController _pageController = PageController(initialPage: 0);
 
-  // Method to get the current formatted date
-  String getCurrentDate() {
-    final now = DateTime.now();
-    final formatter = DateFormat('EEEE, dd MMMM yyyy', 'it'); // Format in Italian
-    return formatter.format(now);
+  DateTime _currentWeek = _getMondayOfThisWeek();
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkForNewDay();
   }
 
-  // Save the count for the current day
+  static DateTime _getMondayOfThisWeek() {
+    final now = DateTime.now();
+    return now.subtract(Duration(days: now.weekday - 1)); // Lunedì della settimana corrente
+  }
+
+  void _updateWeek(int offset) {
+    setState(() {
+      _currentWeek = _currentWeek.add(Duration(days: 7 * offset));
+    });
+  }
+
+  void _goToCurrentWeek() {
+    setState(() {
+      _currentPage = 0;
+      _currentWeek = _getMondayOfThisWeek();
+    });
+    _pageController.animateToPage(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
   void _saveCountForToday() {
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now()); // Use ISO format for keys
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     _dailyCounts[today] = _counter;
   }
 
-  // Get the data for the last 7 days
-  List<BarChartGroupData> _getLast7DaysData() {
-    final now = DateTime.now();
+  void _checkForNewDay() {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    if (!_dailyCounts.containsKey(today)) {
+      setState(() {
+        _counter = 0;
+        _saveCountForToday();
+      });
+    }
+  }
+
+  List<BarChartGroupData> _getWeekData(DateTime weekStart) {
     List<BarChartGroupData> data = [];
-    for (int i = 6; i >= 0; i--) {
-      final day = now.subtract(Duration(days: i));
+    for (int i = 0; i < 7; i++) {
+      final day = weekStart.add(Duration(days: i));
       final dayKey = DateFormat('yyyy-MM-dd').format(day);
       final count = _dailyCounts[dayKey] ?? 0;
       data.add(BarChartGroupData(
-        x: 6 - i,
+        x: i,
         barRods: [
           BarChartRodData(
             toY: count.toDouble(),
@@ -96,87 +128,108 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
+        actions: [
+          IconButton(
+            onPressed: _goToCurrentWeek,
+            tooltip: 'Torna alla settimana corrente',
+            icon: const Icon(Icons.today),
+          ),
+        ],
       ),
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.start, // Align content at the top
           children: <Widget>[
-            const SizedBox(height: 20), // Space at the top
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _isExpanded = !_isExpanded;
-                });
-              },
-              child: Card(
-                elevation: 4, // Adds shadow to the card
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Margin around the card
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0), // Padding inside the card
-                      child: Text(
-                        getCurrentDate(),
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ), // Style the date text
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    if (_isExpanded) // Show chart when expanded
-                      Container(
-                        height: 200,
-                        padding: const EdgeInsets.all(16.0),
-                        child: BarChart(
-                         BarChartData(
-  barGroups: _getLast7DaysData(),
-  borderData: FlBorderData(show: false),
-  gridData: FlGridData(show: false),
-  titlesData: FlTitlesData(
-    bottomTitles: AxisTitles(
-      sideTitles: SideTitles(
-        showTitles: true,
-        getTitlesWidget: (value, _) {
-          final now = DateTime.now().subtract(Duration(days: 6 - value.toInt()));
-          return Text(
-            DateFormat('EEE', 'it').format(now), // Short day name
-            style: const TextStyle(fontSize: 10),
-          );
-        },
-      ),
-    ),
-    leftTitles: AxisTitles(
-      sideTitles: SideTitles(showTitles: false),
-    ),
-  ),
-)
+            const SizedBox(height: 20),
+            // PageView per lo swipe tra settimane
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  final offset = index - _currentPage;
+                  _updateWeek(offset);
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final weekStart = _currentWeek.add(Duration(days: 7 * index));
+                  final weekTitle =
+                      '${DateFormat('dd MMM', 'it').format(weekStart)} - ${DateFormat('dd MMM', 'it').format(weekStart.add(const Duration(days: 6)))}';
+
+                  return Card(
+                    elevation: 4,
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12.0),
+                          child: Text(
+                            weekTitle,
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
-                      ),
-                  ],
-                ),
+                        Container(
+                          height: 160, 
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: _getWeekData(weekStart).isNotEmpty
+                              ? BarChart(
+                                  BarChartData(
+                                    barGroups: _getWeekData(weekStart),
+                                    borderData: FlBorderData(show: false),
+                                    gridData: FlGridData(show: false),
+                                    titlesData: FlTitlesData(
+                                      bottomTitles: AxisTitles(
+                                        sideTitles: SideTitles(
+                                          showTitles: true,
+                                          getTitlesWidget: (value, _) {
+                                            final day =
+                                                weekStart.add(Duration(days: value.toInt()));
+                                            return Text(
+                                              DateFormat('EEE', 'it').format(day),
+                                              style: const TextStyle(fontSize: 10),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      leftTitles: AxisTitles(
+                                        sideTitles: SideTitles(showTitles: false),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : const Center(
+                                  child: Text('Nessun dato disponibile'),
+                                ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
-            const SizedBox(height: 90), // Space between the card and the next text
-            const Text(
-              'Stai a fuma così:',
-            ),
+            const SizedBox(height: 20),
+            const Text('Oggi stai a fuma così:'),
             Text(
               '$_counter',
               style: Theme.of(context).textTheme.headlineMedium,
             ),
-            const SizedBox(height: 20), // Space between counter and buttons
+            const SizedBox(height: 20),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 FloatingActionButton(
                   onPressed: _decrementCounter,
-                  tooltip: 'Decrement',
+                  tooltip: 'Decrementa',
                   child: const Icon(Icons.remove),
                 ),
-                const SizedBox(width: 10), // Space between buttons
+                const SizedBox(width: 10),
                 FloatingActionButton(
                   onPressed: _incrementCounter,
-                  tooltip: 'Increment',
+                  tooltip: 'Incrementa',
                   child: const Icon(Icons.add),
                 ),
               ],
