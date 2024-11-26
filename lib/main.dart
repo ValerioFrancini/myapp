@@ -15,7 +15,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Stocazzo',
+      title: 'eddainonfumare',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
@@ -141,7 +141,8 @@ class _MyHomePageState extends State<MyHomePage> {
           children: <Widget>[
             const SizedBox(height: 20),
             // PageView per lo swipe tra settimane
-            Expanded(
+            SizedBox(
+              height: 240, // Altezza complessiva della card ridotta
               child: PageView.builder(
                 controller: _pageController,
                 onPageChanged: (index) {
@@ -163,7 +164,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12.0),
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
                           child: Text(
                             weekTitle,
                             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -173,7 +174,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           ),
                         ),
                         Container(
-                          height: 160, 
+                          height: 170, // Altezza grafico ridotta
                           padding: const EdgeInsets.symmetric(horizontal: 8.0),
                           child: _getWeekData(weekStart).isNotEmpty
                               ? BarChart(
