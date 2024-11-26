@@ -20,7 +20,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.1.0  # Aggiornato alla versione più recente
+  flutter_lints: ^5.0.0  # Torna alla versione compatibile
 
 flutter:
   uses-material-design: true

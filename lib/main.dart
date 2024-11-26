@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:logger/logger.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('it', null);
   runApp(const MyApp());
 }
 
@@ -38,7 +43,6 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
   bool _isLoading = false;
 
-  // Funzione di registrazione
   Future<void> _register() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
@@ -75,7 +79,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // Funzione di login
   Future<void> _login() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();
@@ -101,10 +104,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _logger.i('Login riuscito.');
 
         if (!mounted) return;
-        // Navigazione diretta alla home
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const MyHomePage(title: 'Benvenuto!')),
+          MaterialPageRoute(
+            builder: (context) => const HomePage(title: '🛠✨'),
+          ),
         );
       } else {
         setState(() {
@@ -118,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     } finally {
       setState(() {
-        _isLoading = false; // Ferma il loader
+        _isLoading = false;
       });
     }
   }
@@ -181,20 +185,187 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class MyHomePage extends StatelessWidget {
-  const MyHomePage({super.key, required this.title});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key, required this.title});
 
   final String title;
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _counter = 0;
+  final Map<String, int> _dailyCounts = {};
+  final PageController _pageController = PageController(initialPage: 0);
+
+  DateTime _currentWeek = _getMondayOfThisWeek();
+  int _currentPage = 0;
+
+  static DateTime _getMondayOfThisWeek() {
+    final now = DateTime.now();
+    return now.subtract(Duration(days: now.weekday - 1));
+  }
+
+  void _updateWeek(int offset) {
+    setState(() {
+      _currentWeek = _currentWeek.add(Duration(days: 7 * offset));
+    });
+  }
+
+  void _goToCurrentWeek() {
+    setState(() {
+      _currentPage = 0;
+      _currentWeek = _getMondayOfThisWeek();
+    });
+    _pageController.animateToPage(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _saveCountForToday() {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    _dailyCounts[today] = _counter;
+  }
+
+  void _incrementCounter() {
+    setState(() {
+      _counter++;
+      _saveCountForToday();
+    });
+  }
+
+  void _decrementCounter() {
+    setState(() {
+      if (_counter > 0) {
+        _counter--;
+        _saveCountForToday();
+      }
+    });
+  }
+
+  List<BarChartGroupData> _getWeekData(DateTime weekStart) {
+    return List.generate(7, (i) {
+      final day = weekStart.add(Duration(days: i));
+      final dayKey = DateFormat('yyyy-MM-dd').format(day);
+      final count = _dailyCounts[dayKey] ?? 0;
+      return BarChartGroupData(
+        x: i,
+        barRods: [
+          BarChartRodData(
+            toY: count.toDouble(),
+            width: 16,
+            color: Colors.deepPurple,
+          ),
+        ],
+      );
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    Logger().i('Rendering MyHomePage'); // Log per verificare il rendering
     return Scaffold(
       appBar: AppBar(
-        title: Text(title),
+        title: Text(widget.title),
+        actions: [
+          IconButton(
+            onPressed: _goToCurrentWeek,
+            tooltip: 'Torna alla settimana corrente',
+            icon: const Icon(Icons.today),
+          ),
+        ],
       ),
-      body: Center(
-        child: Text('Benvenuto! Le tue statistiche personali saranno qui.'),
+      body: Column(
+        children: [
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 240,
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: (index) {
+                final offset = index - _currentPage;
+                _updateWeek(offset);
+                setState(() {
+                  _currentPage = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                final weekStart = _currentWeek.add(Duration(days: 7 * index));
+                final weekTitle =
+                    '${DateFormat('dd MMM', 'it').format(weekStart)} - ${DateFormat('dd MMM', 'it').format(weekStart.add(const Duration(days: 6)))}';
+                return Card(
+                  elevation: 4,
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          weekTitle,
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      Container(
+                        height: 120,
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: BarChart(
+                          BarChartData(
+                            barGroups: _getWeekData(weekStart),
+                            borderData: FlBorderData(show: false),
+                            gridData: FlGridData(show: false),
+                            titlesData: FlTitlesData(
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  getTitlesWidget: (value, _) {
+                                    final day = weekStart.add(Duration(days: value.toInt()));
+                                    return Text(
+                                      DateFormat('EEE', 'it').format(day),
+                                      style: const TextStyle(fontSize: 10),
+                                    );
+                                  },
+                                ),
+                              ),
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text('Oggi stai a fuma così:'),
+          Text(
+            '$_counter',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FloatingActionButton(
+                onPressed: _decrementCounter,
+                tooltip: 'Decrementa',
+                child: const Icon(Icons.remove),
+              ),
+              const SizedBox(width: 10),
+              FloatingActionButton(
+                onPressed: _incrementCounter,
+                tooltip: 'Incrementa',
+                child: const Icon(Icons.add),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
